@@ -70,6 +70,7 @@ IPAddress gw;
 
 // Declare external function from app_httpd.cpp
 extern void startCameraServer(int hPort, int sPort);
+extern void serialDump();
 
 // A Name for the Camera. (set in myconfig.h)
 #if defined(CAM_NAME)
@@ -122,8 +123,10 @@ char apName[64] = "Undefined";
 char httpURL[64] = {"Undefined"};
 char streamURL[64] = {"Undefined"};
 
-// Count number of active streams
-int8_t streamCount = 0;
+// Counters for info screens and debug
+int8_t streamCount = 0;          // Number of currently active streams
+unsigned long streamsServed = 0; // Total completed streams
+unsigned long imagesServed = 0;  // Total image requests
 
 // This will be displayed to identify the firmware
 char myVer[] PROGMEM = __DATE__ " @ " __TIME__;
@@ -176,12 +179,32 @@ const int pwmMax = pow(2,pwmresolution)-1;
 // will be returned for all http requests
 String critERR = "";
 
-// Debug Data for stream and capture
-#if defined(DEBUG_DEFAULT_ON)
-    bool debugData = true;
-#else
-    bool debugData = false;
-#endif
+// Debug flag for stream and capture data
+bool debugData;
+
+void debugOn() {
+    debugData = true;
+    Serial.println("Camera debug data is enabled (send 'd' for status dump, or any other char to disable debug)");
+}
+
+void debugOff() {
+    debugData = false;
+    Serial.println("Camera debug data is disabled (send 'd' for status dump, or any other char to enable debug)");
+}
+
+// Serial input (debugging controls)
+void handleSerial() {
+    if (Serial.available()) {
+        char cmd = Serial.read();
+        if (cmd == 'd' ) {
+            serialDump();
+        } else {
+            if (debugData) debugOff();
+            else debugOn();
+        }
+    }
+    while (Serial.available()) Serial.read();  // chomp the buffer
+}
 
 // Notification LED 
 void flashLED(int flashtime) {
@@ -598,8 +621,11 @@ void setup() {
         Serial.printf("\nCamera Ready!\nUse '%s' to connect\n", httpURL);
         Serial.printf("Stream viewer available at '%sview'\n", streamURL);
         Serial.printf("Raw stream URL is '%s'\n", streamURL);
-        if (debugData) Serial.println("Camera debug data is enabled (send any char to disable)");
-        else Serial.println("Camera debug data is disabled (send any char to enable)");
+        #if defined(DEBUG_DEFAULT_ON)
+            debugOn();
+        #else
+            debugOff();
+        #endif
     } else {
         Serial.printf("\nCamera unavailable due to initialisation errors.\n\n");
     }
@@ -618,9 +644,11 @@ void loop() {
     */
     if (accesspoint) {
         // Accespoint is permanently up, so just loop, servicing the captive portal as needed
+        // Rather than loop forever, follow the watchdog, in case we later add auto re-scan.
         unsigned long start = millis();
         while (millis() - start < WIFI_WATCHDOG ) {
             delay(100);
+            handleSerial();
             if (captivePortal) dnsServer.processNextRequest();
         }
     } else {
@@ -637,17 +665,7 @@ void loop() {
             unsigned long start = millis();
             while (millis() - start < WIFI_WATCHDOG ) {
                 delay(100);
-                if (Serial.available()) {
-                    // Toggle debug output on serial input
-                    if (debugData) {
-                        debugData = false;
-                        Serial.println("Camera debug data is disabled (send any char to enable)");
-                    } else {
-                        debugData = true;
-                        Serial.println("Camera debug data is enabled (send any char to disable)");
-                    }
-                }
-                while (Serial.available()) Serial.read();  // chomp the buffer
+                handleSerial();
             }
         } else {
             // disconnected; attempt to reconnect
