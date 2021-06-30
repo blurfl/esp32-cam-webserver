@@ -72,9 +72,10 @@ String jsonExtract(String json, String name){
   int start = 0, stop = 0;
   
   name = String("\"") + name + String("\"");
-  if (json.indexOf(name) == std::string::npos) return json.substring(0,0);
+//   if (json.indexOf(name) == std::string::npos) return json.substring(0,0);
 //   if (json.indexOf(name) == name.length()) return json.substring(0,0);
-  start = json.indexOf(name) + name.length() + 1;
+ if (json.indexOf(name) < json.length()) return json.substring(0,0);
+ start = json.indexOf(name) + name.length() + 1;
   next = json.charAt(start);
   if(next == '\"'){
     //Serial.println(".. a string");
