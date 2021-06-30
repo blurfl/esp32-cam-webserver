@@ -73,6 +73,7 @@ String jsonExtract(String json, String name){
   
   name = String("\"") + name + String("\"");
   if (json.indexOf(name) == std::string::npos) return json.substring(0,0);
+//   if (json.indexOf(name) == name.length()) return json.substring(0,0);
   start = json.indexOf(name) + name.length() + 1;
   next = json.charAt(start);
   if(next == '\"'){
